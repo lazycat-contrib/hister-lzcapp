@@ -5,10 +5,10 @@ application:
   upstreams:
     - location: /
       backend: http://hister:4433/
-
 services:
   hister:
     # 上游镜像以 UID/GID 65532 运行
+    # upstream: ghcr.io/asciimoo/hister:v0.21.0
     image: ghcr.1ms.run/asciimoo/hister:v0.21.0
     # run_as 与 setup_script 在同一 service 上互斥, 这里用 user 保持非 root 运行。
     # 持久目录通过 binds 挂载, Hister 以 65532 写入。
