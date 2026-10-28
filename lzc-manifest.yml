@@ -1,0 +1,39 @@
+application:
+  subdomain: hister
+  background_task: true
+  multi_instance: false
+  upstreams:
+    - location: /
+      backend: http://hister:4433/
+
+services:
+  hister:
+    # 上游镜像以 UID/GID 65532 运行
+    image: ghcr.1ms.run/asciimoo/hister:v0.21.0
+    # run_as 与 setup_script 在同一 service 上互斥, 这里用 user 保持非 root 运行。
+    # 持久目录通过 binds 挂载, Hister 以 65532 写入。
+    user: "65532:65532"
+    # 首次启动时创建管理员账号 (Hister 无按角色映射管理员的机制)。
+    # 脚本以 root 执行, 完成后 lzcos 照常执行镜像原本的 entrypoint。
+    setup_script: |
+      /bin/sh /lzcapp/pkg/content/setup.sh
+    environment:
+      # 监听容器内所有网卡，供懒猫网关回源
+      - HISTER__SERVER__ADDRESS=0.0.0.0:4433
+      # 站点外部地址，Cookie Secure、CSRF 同源判断均依赖它
+      - HISTER__SERVER__BASE_URL=https://${LAZYCAT_SUBDOMAIN}.${LAZYCAT_BOX_DOMAIN}
+      # 免密登录：直接采用懒猫网关下发的真实用户身份，每个微服用户对应一个 Hister 账号
+      - HISTER__SERVER__PROXY_AUTH_HEADER=X-HC-User-ID
+    binds:
+      - /lzcapp/var/hister:/hister/data
+      - /lzcapp/pkg/content:/lzcapp/pkg/content
+    tmpfs:
+      - /tmp
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - wget -q --spider http://127.0.0.1:4433/health || exit 1
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s

@@ -1,0 +1,44 @@
+version: 1
+
+project:
+  root: .
+  build_config: lzc-build.yml
+  package_file: package.yml
+  output: dist/community.lazycat.app.hister.lpk
+  target_arch: amd64
+
+update:
+  strategy: publish
+  allow_downgrade: false
+  version_source:
+    type: image
+    image: hister
+
+build:
+  # 需要执行 lzc-build.yml 里的 buildscript，把 ptyexec 编译进 content 目录。
+  run_buildscript: true
+  toolchains:
+    - kind: go
+      version: "1.22"
+
+images:
+  - id: hister
+    target: service
+    service: hister
+    source: ghcr.io/asciimoo/hister
+    channel: stable
+    sort: semver
+    tag_regex: '^v?\d+\.\d+\.\d+$'
+    version_regex: '^v?(?P<version>\d+\.\d+\.\d+)$'
+    delivery:
+      mode: mirror
+      require_digest_match: true
+
+stores:
+  official:
+    enabled: false
+  private:
+    enabled: true
+    skip_if_version_exists: true
+    name: Hister
+    summary: "自建私人搜索引擎：全文索引浏览过的网页与本地文件"

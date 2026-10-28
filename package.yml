@@ -1,0 +1,15 @@
+package: community.lazycat.app.hister
+version: 0.21.0
+name: Hister
+description: "Private search engine for the pages you visit and the files you keep, with full-text indexing and optional semantic search"
+min_os_version: 1.6.0
+author: asciimoo
+license: AGPL-3.0
+homepage: https://github.com/asciimoo/hister
+locales:
+  zh:
+    name: "Hister"
+    description: "自建私人搜索引擎：全文索引浏览过的网页与本地文件，支持字段查询、语义搜索、终端与 MCP 客户端"
+  en:
+    name: "Hister"
+    description: "Private search engine for the pages you visit and the files you keep, with full-text indexing and optional semantic search"

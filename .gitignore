@@ -1,0 +1,4 @@
+dist/
+*.lpk
+# 构建产物: 由 scripts/build-content.sh 生成
+content/

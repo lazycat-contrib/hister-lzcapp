@@ -1,0 +1,6 @@
+manifest: ./lzc-manifest.yml
+pkgout: ./dist/
+icon: ./icon.png
+# 打包辅助文件: ptyexec (驱动 Hister 交互式密码提示) 与 setup.sh (管理员引导)
+contentdir: ./content/
+buildscript: ./scripts/build-content.sh
