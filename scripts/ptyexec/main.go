@@ -9,17 +9,24 @@
 // ptyexec 分配一个 PTY，把子进程设为该 PTY 的会话首进程并挂上控制终端，
 // 然后按行把输入写进 master，最后把 PTY 的输出转发到 stdout。
 //
-// 用法: ptyexec <输入文件> <命令> [参数...]
+// 用法: ptyexec [-u UID[:GID]] <输入文件> <命令> [参数...]
 //
 // 输入文件每行一条输入，行尾用 \n 即可，ptyexec 会按行补上回车。
+//
+// -u 指定以哪个身份运行子进程。setup_script 以 root 运行时，需要用它把
+// Hister 命令降权到容器实际的运行用户，否则生成的密钥文件属主会是 root，
+// 之后 Hister 进程读不了自己的密钥而启动失败。
 package main
 
 import (
 	"bytes"
+	"flag"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
+	"strconv"
+	"strings"
 	"syscall"
 	"time"
 	"unsafe"
@@ -53,13 +60,47 @@ func setRaw(fd uintptr) error {
 	return ioctl(fd, syscall.TCSETS, uintptr(unsafe.Pointer(&t)))
 }
 
+// parseUser 解析 "UID" 或 "UID:GID"。未指定时返回 0,0,表示不降权。
+func parseUser(spec string) (uint32, uint32, error) {
+	if spec == "" {
+		return 0, 0, nil
+	}
+	uidPart, gidPart, hasGid := strings.Cut(spec, ":")
+	uid, err := strconv.ParseUint(uidPart, 10, 32)
+	if err != nil {
+		return 0, 0, fmt.Errorf("invalid uid %q: %w", uidPart, err)
+	}
+	gid := uint64(uid)
+	if hasGid {
+		gid, err = strconv.ParseUint(gidPart, 10, 32)
+		if err != nil {
+			return 0, 0, fmt.Errorf("invalid gid %q: %w", gidPart, err)
+		}
+	}
+	return uint32(uid), uint32(gid), nil
+}
+
 func main() {
-	if len(os.Args) < 3 {
-		fmt.Fprintln(os.Stderr, "usage: ptyexec <input-file> <cmd> [args...]")
+	runAs := flag.String("u", "", "run the child as this UID[:GID]")
+	flag.Usage = func() {
+		fmt.Fprintln(os.Stderr, "usage: ptyexec [-u UID[:GID]] <input-file> <cmd> [args...]")
+		flag.PrintDefaults()
+	}
+	flag.Parse()
+
+	args := flag.Args()
+	if len(args) < 2 {
+		flag.Usage()
 		os.Exit(2)
 	}
 
-	input, err := os.ReadFile(os.Args[1])
+	uid, gid, err := parseUser(*runAs)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "parse -u: %v\n", err)
+		os.Exit(2)
+	}
+
+	input, err := os.ReadFile(args[0])
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "read input: %v\n", err)
 		os.Exit(1)
@@ -92,15 +133,17 @@ func main() {
 		os.Exit(1)
 	}
 
-	cmd := exec.Command(os.Args[2], os.Args[3:]...)
+	cmd := exec.Command(args[1], args[2:]...)
 	cmd.Stdin = slave
 	cmd.Stdout = slave
 	cmd.Stderr = slave
 	// 让子进程拥有控制终端，这样它打开 /dev/tty 时拿到的是这个 PTY。
+	cred := &syscall.Credential{Uid: uid, Gid: gid}
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		Setsid:  true,
 		Setctty: true,
 		Ctty:    0,
+		Credential: cred,
 	}
 
 	if err := cmd.Start(); err != nil {
