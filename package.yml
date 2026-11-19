@@ -1,5 +1,5 @@
 package: community.lazycat.app.hister
-version: 0.21.0
+version: 0.22.0
 name: Hister
 description: "Private search engine for the pages you visit and the files you keep, with full-text indexing and optional semantic search"
 min_os_version: 1.6.0
